@@ -155,7 +155,33 @@ public class TransactionServlet extends HttpServlet {
             /* Begin transactions */
             try {
                 connection.setAutoCommit(false);
+                PreparedStatement stmUpdate = connection.prepareStatement("UPDATE  Account SET balance = balance - ? WHERE account_number = ?");
+                stmUpdate.setBigDecimal(1, transactionDTO.getAmount());
+                stmUpdate.setString(2, transactionDTO.getAccount());
+                if (stmUpdate.executeUpdate() != 1) throw new SQLException("Failed to update the balance");
 
+                PreparedStatement stmNewTransaction =
+                        connection.prepareStatement("INSERT INTO Transaction (account, type, description, amount, date) VALUES (?, ?, ?, ?, ?)");
+                stmNewTransaction.setString(1, transactionDTO.getAccount());
+                stmNewTransaction.setString(2, "DEBIT");
+                stmNewTransaction.setString(3, "Withdraw");
+                stmNewTransaction.setBigDecimal(4, transactionDTO.getAmount());
+                stmNewTransaction.setTimestamp(5, new Timestamp(new Date().getTime()));
+                if (stmNewTransaction.executeUpdate() != 1) throw new SQLException("Failed to add the debit transaction record");
+
+                Thread.sleep(5000);
+                connection.commit();
+
+                ResultSet resultSet = stm.executeQuery();
+                resultSet.next();
+                String name = resultSet.getString("holder_name");
+                String address = resultSet.getString("holder_address");
+                BigDecimal balance = resultSet.getBigDecimal("balance");
+                AccountDTO accountDTO = new AccountDTO(transactionDTO.getAccount(), name, address, balance);
+
+                response.setStatus(HttpServletResponse.SC_CREATED);
+                response.setContentType("application/json");
+                JsonbBuilder.create().toJson(accountDTO, response.getWriter());
             }
             catch (Throwable t) {
                 connection.rollback();
@@ -170,8 +196,7 @@ public class TransactionServlet extends HttpServlet {
         catch (JsonException  e) {
             e.printStackTrace();
             response.sendError(HttpServletResponse.SC_BAD_REQUEST, e.getMessage());
-        }
-        catch (SQLException e) {
+        } catch (SQLException e) {
             e.printStackTrace();
             response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Failed to withdraw");
         }
