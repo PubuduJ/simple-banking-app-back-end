@@ -234,6 +234,19 @@ public class TransactionServlet extends HttpServlet {
                 throw new JsonException("Insufficient account balance");
             }
 
+            try {
+                connection.setAutoCommit(false);
+
+            }
+            catch (Throwable t) {
+                connection.rollback();
+                t.printStackTrace();
+                response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Failed to transfer the money");
+            }
+            finally {
+                connection.setAutoCommit(true);
+            }
+            connection.close();
         }
         catch (JsonException  e) {
             response.sendError(HttpServletResponse.SC_BAD_REQUEST, e.getMessage());
