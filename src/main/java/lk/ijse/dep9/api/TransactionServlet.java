@@ -203,7 +203,43 @@ public class TransactionServlet extends HttpServlet {
     }
 
     private void transferMoney(TransferDTO transferDTO, HttpServletResponse response) throws IOException {
-        System.out.println("Transfer money");
-        System.out.println(transferDTO);
+        try {
+            /* Data validation */
+            if (transferDTO.getFrom() == null || !transferDTO.getFrom().matches("[A-Fa-f\\d]{8}(-[A-Fa-f\\d]{4}){3}-[A-Fa-f\\d]{12}")) {
+                throw new JsonException("Invalid from account number");
+            }
+            else if (transferDTO.getTo() == null || !transferDTO.getTo().matches("[A-Fa-f\\d]{8}(-[A-Fa-f\\d]{4}){3}-[A-Fa-f\\d]{12}")) {
+                throw new JsonException("Invalid to account number");
+            }
+            else if (transferDTO.getAmount() == null || transferDTO.getAmount().compareTo(new BigDecimal(100)) < 0) {
+                throw new JsonException("Invalid amount");
+            }
+
+            /* Business validation */
+            Connection connection = pool.getConnection();
+            PreparedStatement stm1 = connection.prepareStatement("SELECT * FROM Account WHERE account_number = ?");
+            stm1.setString(1, transferDTO.getTo());
+            ResultSet rst1 = stm1.executeQuery();
+            if (!rst1.next()) throw new JsonException("Invalid to account number");
+
+            PreparedStatement stm2 = connection.prepareStatement("SELECT * FROM Account WHERE account_number = ?");
+            stm2.setString(1, transferDTO.getFrom());
+
+            ResultSet rst2 = stm2.executeQuery();
+            if (!rst2.next()) throw new JsonException("Invalid from account number");
+
+            BigDecimal toAccountBalance = rst1.getBigDecimal("balance");
+            BigDecimal fromAccountBalance = rst2.getBigDecimal("balance");
+            if (fromAccountBalance.subtract(transferDTO.getAmount()).compareTo(new BigDecimal(100)) < 0){
+                throw new JsonException("Insufficient account balance");
+            }
+
+        }
+        catch (JsonException  e) {
+            response.sendError(HttpServletResponse.SC_BAD_REQUEST, e.getMessage());
+        } catch (SQLException e) {
+            e.printStackTrace();
+            response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Failed to transfer the amount");
+        }
     }
 }
