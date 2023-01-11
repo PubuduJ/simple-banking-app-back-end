@@ -78,7 +78,17 @@ public class TransactionServlet extends HttpServlet {
             if (!rst.next()){
                 throw new JsonException("Invalid account number");
             }
+            try {
+                connection.setAutoCommit(false);
 
+            }
+            catch (Throwable t) {
+                connection.rollback();
+            }
+            finally {
+                connection.setAutoCommit(true);
+            }
+            connection.close();
         }
         catch (JsonException e) {
             response.sendError(HttpServletResponse.SC_BAD_REQUEST, e.getMessage());
