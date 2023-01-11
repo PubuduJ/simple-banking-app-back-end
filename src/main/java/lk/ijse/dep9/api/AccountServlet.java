@@ -9,8 +9,11 @@ import jakarta.servlet.annotation.*;
 import lk.ijse.dep9.dto.AccountDTO;
 import javax.sql.DataSource;
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.sql.SQLException;
+import java.util.UUID;
 
 @WebServlet(name = "account-servlet", value = "/accounts/*", loadOnStartup = 0)
 public class AccountServlet extends HttpServlet {
@@ -37,11 +40,31 @@ public class AccountServlet extends HttpServlet {
         }
     }
 
-    private void createAccount(AccountDTO accountDTO, HttpServletResponse response) {
+    private void createAccount(AccountDTO accountDTO, HttpServletResponse response) throws IOException {
         try (Connection connection = pool.getConnection()) {
-            System.out.println(connection);
+            if (accountDTO.getName() == null || !accountDTO.getName().matches("[A-Za-z ]+")) {
+                throw new JsonException("Invalid account holder name");
+            }
+            else if (accountDTO.getAddress() == null || !accountDTO.getAddress().matches("[-A-Za-z\\d/\\\\,:;|. ]+")) {
+                throw new JsonException("Invalid account holder address");
+            }
+            accountDTO.setAccount(UUID.randomUUID().toString());
+
+            PreparedStatement stm = connection.prepareStatement("INSERT INTO Account (account_number, holder_name, holder_address) VALUES (?, ?, ?)");
+            stm.setString(1, accountDTO.getAccount());
+            stm.setString(2, accountDTO.getName());
+            stm.setString(3, accountDTO.getAddress());
+            if (stm.executeUpdate() == 1) {
+                response.setStatus(HttpServletResponse.SC_CREATED);
+                response.setContentType("application/json");
+                JsonbBuilder.create().toJson(accountDTO, response.getWriter());
+            }
+            else {
+                throw new SQLException("Something went wrong, try again");
+            }
         } catch (SQLException e) {
-            throw new RuntimeException(e);
+            e.printStackTrace();
+            response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, e.getMessage());
         }
     }
 }

@@ -37,7 +37,7 @@ public class TransactionServlet extends HttpServlet {
                     withdrawMoney(transactionDTO, response);
 
                 }
-                else if(transactionType.equalsIgnoreCase("deposit")) {
+                else if (transactionType.equalsIgnoreCase("deposit")) {
                     TransactionDTO transactionDTO = JsonbBuilder.create().fromJson(json, TransactionDTO.class);
                     depositMoney(transactionDTO, response);
                 }
@@ -58,13 +58,13 @@ public class TransactionServlet extends HttpServlet {
         }
     }
 
-    private void withdrawMoney(TransactionDTO transactionDTO, HttpServletResponse response) {
-        System.out.println("Withdraw money");
+    private void depositMoney(TransactionDTO transactionDTO, HttpServletResponse response) {
+        System.out.println("Deposit money");
         System.out.println(transactionDTO);
     }
 
-    private void depositMoney(TransactionDTO transactionDTO, HttpServletResponse response) {
-        System.out.println("Deposit money");
+    private void withdrawMoney(TransactionDTO transactionDTO, HttpServletResponse response) {
+        System.out.println("Withdraw money");
         System.out.println(transactionDTO);
     }
 
