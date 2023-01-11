@@ -196,7 +196,8 @@ public class TransactionServlet extends HttpServlet {
         catch (JsonException  e) {
             e.printStackTrace();
             response.sendError(HttpServletResponse.SC_BAD_REQUEST, e.getMessage());
-        } catch (SQLException e) {
+        }
+        catch (SQLException e) {
             e.printStackTrace();
             response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Failed to withdraw");
         }
@@ -236,7 +237,46 @@ public class TransactionServlet extends HttpServlet {
 
             try {
                 connection.setAutoCommit(false);
+                PreparedStatement stmWithdraw = connection.prepareStatement("UPDATE  Account SET balance = ? WHERE account_number = ?");
+                stmWithdraw.setBigDecimal(1, fromAccountBalance.subtract(transferDTO.getAmount()));
+                stmWithdraw.setString(2, transferDTO.getFrom());
+                if (stmWithdraw.executeUpdate() != 1) throw new SQLException("Failed to update the balance of the from account");
 
+                PreparedStatement stmNewTransaction =
+                        connection.prepareStatement("INSERT INTO Transaction (account, type, description, amount, date) VALUES (?, ?, ?, ?, ?)");
+                stmNewTransaction.setString(1, transferDTO.getFrom());
+                stmNewTransaction.setString(2, "DEBIT");
+                stmNewTransaction.setString(3, "Transfer");
+                stmNewTransaction.setBigDecimal(4, transferDTO.getAmount());
+                stmNewTransaction.setTimestamp(5, new Timestamp(new Date().getTime()));
+                if (stmNewTransaction.executeUpdate() != 1) throw new SQLException("Failed to add the debit transaction record");
+
+                PreparedStatement stmDeposit = connection.prepareStatement("UPDATE  Account SET balance = ? WHERE account_number = ?");
+                stmDeposit.setBigDecimal(1, toAccountBalance.add(transferDTO.getAmount()));
+                stmDeposit.setString(2, transferDTO.getTo());
+                if (stmDeposit.executeUpdate() != 1) throw new SQLException("Failed to update the balance");
+
+                stmNewTransaction =
+                        connection.prepareStatement("INSERT INTO Transaction (account, type, description, amount, date) VALUES (?, ?, ?, ?, ?)");
+                stmNewTransaction.setString(1, transferDTO.getTo());
+                stmNewTransaction.setString(2, "CREDIT");
+                stmNewTransaction.setString(3, "Transfer");
+                stmNewTransaction.setBigDecimal(4, transferDTO.getAmount());
+                stmNewTransaction.setTimestamp(5, new Timestamp(new Date().getTime()));
+                if (stmNewTransaction.executeUpdate() != 1) throw new SQLException("Failed to add the credit transaction record");
+
+                connection.commit();
+
+                ResultSet resultSet = stm2.executeQuery();
+                resultSet.next();
+                String name = resultSet.getString("holder_name");
+                String address = resultSet.getString("holder_address");
+                BigDecimal balance = resultSet.getBigDecimal("balance");
+                AccountDTO accountDTO = new AccountDTO(transferDTO.getFrom(), name, address, balance);
+
+                response.setStatus(HttpServletResponse.SC_CREATED);
+                response.setContentType("application/json");
+                JsonbBuilder.create().toJson(accountDTO, response.getWriter());
             }
             catch (Throwable t) {
                 connection.rollback();
@@ -250,7 +290,8 @@ public class TransactionServlet extends HttpServlet {
         }
         catch (JsonException  e) {
             response.sendError(HttpServletResponse.SC_BAD_REQUEST, e.getMessage());
-        } catch (SQLException e) {
+        }
+        catch (SQLException e) {
             e.printStackTrace();
             response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Failed to transfer the amount");
         }
