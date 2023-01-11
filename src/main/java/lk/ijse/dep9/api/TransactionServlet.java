@@ -1,5 +1,6 @@
 package lk.ijse.dep9.api;
 
+import jakarta.annotation.Resource;
 import jakarta.json.Json;
 import jakarta.json.JsonException;
 import jakarta.json.JsonObject;
@@ -10,10 +11,14 @@ import jakarta.servlet.http.*;
 import jakarta.servlet.annotation.*;
 import lk.ijse.dep9.dto.TransactionDTO;
 import lk.ijse.dep9.dto.TransferDTO;
+import javax.sql.DataSource;
 import java.io.IOException;
 
 @WebServlet(name = "transaction-servlet", value = "/transactions/*", loadOnStartup = 1)
 public class TransactionServlet extends HttpServlet {
+
+    @Resource(lookup = "java:comp/env/jdbc/bank_db")
+    private DataSource pool;
 
     @Override
     protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {

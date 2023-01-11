@@ -1,16 +1,22 @@
 package lk.ijse.dep9.api;
 
+import jakarta.annotation.Resource;
 import jakarta.json.JsonException;
 import jakarta.json.bind.JsonbBuilder;
 import jakarta.servlet.*;
 import jakarta.servlet.http.*;
 import jakarta.servlet.annotation.*;
 import lk.ijse.dep9.dto.AccountDTO;
+import javax.sql.DataSource;
 import java.io.IOException;
-
+import java.sql.Connection;
+import java.sql.SQLException;
 
 @WebServlet(name = "account-servlet", value = "/accounts/*", loadOnStartup = 0)
 public class AccountServlet extends HttpServlet {
+
+    @Resource(lookup = "java:comp/env/jdbc/bank_db")
+    private DataSource pool;
 
     @Override
     protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
@@ -32,6 +38,10 @@ public class AccountServlet extends HttpServlet {
     }
 
     private void createAccount(AccountDTO accountDTO, HttpServletResponse response) {
-        System.out.println(accountDTO);
+        try (Connection connection = pool.getConnection()) {
+            System.out.println(connection);
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
     }
 }
