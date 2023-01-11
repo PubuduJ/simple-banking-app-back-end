@@ -151,11 +151,27 @@ public class TransactionServlet extends HttpServlet {
             if (currentBalance.subtract(transactionDTO.getAmount()).compareTo(new BigDecimal(100)) < 0){
                 throw new JsonException("Insufficient account balance");
             }
+
+            /* Begin transactions */
+            try {
+                connection.setAutoCommit(false);
+
+            }
+            catch (Throwable t) {
+                connection.rollback();
+                t.printStackTrace();
+                response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Failed to withdraw the money");
+            }
+            finally {
+                connection.setAutoCommit(true);
+            }
+            connection.close();
         }
         catch (JsonException  e) {
             e.printStackTrace();
             response.sendError(HttpServletResponse.SC_BAD_REQUEST, e.getMessage());
-        } catch (SQLException e) {
+        }
+        catch (SQLException e) {
             e.printStackTrace();
             response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Failed to withdraw");
         }
