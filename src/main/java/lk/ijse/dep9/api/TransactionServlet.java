@@ -9,15 +9,14 @@ import jakarta.json.stream.JsonParser;
 import jakarta.servlet.*;
 import jakarta.servlet.http.*;
 import jakarta.servlet.annotation.*;
+import lk.ijse.dep9.dto.AccountDTO;
 import lk.ijse.dep9.dto.TransactionDTO;
 import lk.ijse.dep9.dto.TransferDTO;
 import javax.sql.DataSource;
 import java.io.IOException;
 import java.math.BigDecimal;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
+import java.sql.*;
+import java.util.Date;
 
 @WebServlet(name = "transaction-servlet", value = "/transactions/*", loadOnStartup = 1)
 public class TransactionServlet extends HttpServlet {
@@ -65,7 +64,7 @@ public class TransactionServlet extends HttpServlet {
 
     private void depositMoney(TransactionDTO transactionDTO, HttpServletResponse response) throws IOException {
         try {
-            if (transactionDTO.getAccount() == null || !transactionDTO.getAccount().matches("[A-Fa-f0-9]{8}(-[A-Fa-f0-9]{4}){3}-[A-Fa-f0-9]{12}")){
+            if (transactionDTO.getAccount() == null || !transactionDTO.getAccount().matches("[A-Fa-f\\d]{8}(-[A-Fa-f\\d]{4}){3}-[A-Fa-f\\d]{12}")){
                 throw new JsonException("Invalid account number");
             }
             else if (transactionDTO.getAmount() == null || transactionDTO.getAmount().compareTo(new BigDecimal(1000)) < 0) {
@@ -75,15 +74,41 @@ public class TransactionServlet extends HttpServlet {
             PreparedStatement stm = connection.prepareStatement("SELECT * FROM Account WHERE account_number = ?");
             stm.setString(1, transactionDTO.getAccount());
             ResultSet rst = stm.executeQuery();
-            if (!rst.next()){
-                throw new JsonException("Invalid account number");
-            }
+            if (!rst.next()) throw new JsonException("Invalid account number");
+
             try {
                 connection.setAutoCommit(false);
+                PreparedStatement stmUpdate = connection.prepareStatement("UPDATE Account SET balance = balance + ? WHERE account_number = ?");
+                stmUpdate.setBigDecimal(1, transactionDTO.getAmount());
+                stmUpdate.setString(2, transactionDTO.getAccount());
+                if (stmUpdate.executeUpdate() != 1) throw new SQLException("Failed to update the balance");
 
+                PreparedStatement stmNewTransaction =
+                        connection.prepareStatement("INSERT INTO Transaction (account, type, description, amount, date) VALUES (?, ?, ?, ?, ?)");
+                stmNewTransaction.setString(1, transactionDTO.getAccount());
+                stmNewTransaction.setString(2, "CREDIT");
+                stmNewTransaction.setString(3, "Deposit");
+                stmNewTransaction.setBigDecimal(4, transactionDTO.getAmount());
+                stmNewTransaction.setTimestamp(5, new Timestamp(new Date().getTime()));
+                if (stmNewTransaction.executeUpdate() != 1) throw new SQLException("Failed to add a transaction record");
+
+                connection.commit();
+
+                ResultSet resultSet = stm.executeQuery();
+                resultSet.next();
+                String name = resultSet.getString("holder_name");
+                String address = resultSet.getString("holder_address");
+                BigDecimal balance = resultSet.getBigDecimal("balance");
+                AccountDTO accountDTO = new AccountDTO(transactionDTO.getAccount(), name, address, balance);
+
+                response.setStatus(HttpServletResponse.SC_CREATED);
+                response.setContentType("application/json");
+                JsonbBuilder.create().toJson(accountDTO, response.getWriter());
             }
             catch (Throwable t) {
                 connection.rollback();
+                t.printStackTrace();
+                response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Failed to deposit the money to the account");
             }
             finally {
                 connection.setAutoCommit(true);
@@ -91,6 +116,7 @@ public class TransactionServlet extends HttpServlet {
             connection.close();
         }
         catch (JsonException e) {
+            e.printStackTrace();
             response.sendError(HttpServletResponse.SC_BAD_REQUEST, e.getMessage());
         }
         catch (SQLException e) {

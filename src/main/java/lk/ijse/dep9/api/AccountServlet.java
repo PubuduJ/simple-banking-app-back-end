@@ -32,6 +32,7 @@ public class AccountServlet extends HttpServlet {
                 createAccount(accountDTO, response);
             }
             catch (JsonException e) {
+                e.printStackTrace();
                 response.sendError(HttpServletResponse.SC_BAD_REQUEST, e.getMessage());
             }
         }
