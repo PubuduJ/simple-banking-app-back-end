@@ -3,7 +3,6 @@ package lk.ijse.dep9.api;
 import jakarta.servlet.*;
 import jakarta.servlet.http.*;
 import jakarta.servlet.annotation.*;
-
 import java.io.IOException;
 
 @WebServlet(name = "account-servlet", value = "/accounts/*", loadOnStartup = 0)
