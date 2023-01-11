@@ -63,7 +63,8 @@ public class AccountServlet extends HttpServlet {
             else {
                 throw new SQLException("Something went wrong, try again");
             }
-        } catch (SQLException e) {
+        }
+        catch (SQLException e) {
             e.printStackTrace();
             response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, e.getMessage());
         }
