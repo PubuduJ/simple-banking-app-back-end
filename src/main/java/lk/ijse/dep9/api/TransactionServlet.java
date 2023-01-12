@@ -240,6 +240,7 @@ public class TransactionServlet extends HttpServlet {
                 throw new JsonException("Insufficient account balance");
             }
 
+            /* Begin transactions */
             try {
                 connection.setAutoCommit(false);
                 PreparedStatement stmWithdraw = connection.prepareStatement("UPDATE Account SET balance = ? WHERE account_number = ?");
