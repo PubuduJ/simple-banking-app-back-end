@@ -14,7 +14,7 @@ API documentations listed below.
 - The minimum amount that can be transferred from one account to another is 100.
 - The minimum balance that can be present on an account is 100.
 
-#### Entity relationship diagram of the database
+#### ERD of the database
 
 <img src="assets/ERD.png" alt="text-editor" width="600px"/>
 
