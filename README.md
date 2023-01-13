@@ -53,7 +53,7 @@ You can find the database script.sql for this project under the **resources** di
 This project was carried out under the guidance of the [IJSE](https://www.ijse.lk/) Direct Entry Program 9.
 
 ## Version
-v1.0.0
+v1.1.0
 
 ## License
 Copyright &copy; 2023 [Pubudu Janith](https://www.linkedin.com/in/pubudujanith94/). All Rights Reserved.<br>
