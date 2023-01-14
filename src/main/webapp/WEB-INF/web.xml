@@ -18,9 +18,17 @@
             <param-value>http://127.0.0.1:5050, http://0:0:0:0:0:0:0:1</param-value>
         </init-param>
     </filter>
-
     <filter-mapping>
         <filter-name>cors-filter</filter-name>
+        <servlet-name>*</servlet-name>
+    </filter-mapping>
+
+    <filter>
+        <filter-name>exception-filter</filter-name>
+        <filter-class>lk.ijse.dep9.api.filter.ExceptionFilter</filter-class>
+    </filter>
+    <filter-mapping>
+        <filter-name>exception-filter</filter-name>
         <servlet-name>*</servlet-name>
     </filter-mapping>
 

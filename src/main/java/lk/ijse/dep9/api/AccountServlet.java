@@ -7,6 +7,8 @@ import jakarta.servlet.*;
 import jakarta.servlet.http.*;
 import jakarta.servlet.annotation.*;
 import lk.ijse.dep9.dto.AccountDTO;
+import lk.ijse.dep9.exception.ResponseStatusException;
+
 import javax.sql.DataSource;
 import java.io.IOException;
 import java.math.BigDecimal;
@@ -24,31 +26,26 @@ public class AccountServlet extends HttpServlet {
     @Override
     protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
         if (request.getPathInfo() == null || request.getPathInfo().equals("/")) {
-            try {
-                if (request.getContentType() == null || !request.getContentType().startsWith("application/json")) {
-                    throw new JsonException("Invalid JSON");
-                }
-                AccountDTO accountDTO = JsonbBuilder.create().fromJson(request.getReader(), AccountDTO.class);
-                createAccount(accountDTO, response);
+            if (request.getContentType() == null || !request.getContentType().startsWith("application/json")) {
+                throw new ResponseStatusException(400, "Invalid JSON");
             }
-            catch (JsonException e) {
-                e.printStackTrace();
-                response.sendError(HttpServletResponse.SC_BAD_REQUEST, e.getMessage());
-            }
+            AccountDTO accountDTO = JsonbBuilder.create().fromJson(request.getReader(), AccountDTO.class);
+            createAccount(accountDTO, response);
         }
         else {
-            response.sendError(HttpServletResponse.SC_NOT_IMPLEMENTED);
+            throw new ResponseStatusException(501);
         }
     }
 
     private void createAccount(AccountDTO accountDTO, HttpServletResponse response) throws IOException {
         try (Connection connection = pool.getConnection()) {
             if (accountDTO.getName() == null || !accountDTO.getName().matches("[A-Za-z ]+")) {
-                throw new JsonException("Invalid account holder name");
+                throw new ResponseStatusException(400, "Invalid account holder name");
             }
             else if (accountDTO.getAddress() == null || !accountDTO.getAddress().matches("[-A-Za-z\\d/\\\\,:;|. ]+")) {
-                throw new JsonException("Invalid account holder address");
+                throw new ResponseStatusException(400, "Invalid account holder address");
             }
+
             accountDTO.setAccount(UUID.randomUUID().toString());
 
             PreparedStatement stm = connection.prepareStatement("INSERT INTO Account (account_number, holder_name, holder_address) VALUES (?, ?, ?)");
@@ -65,8 +62,7 @@ public class AccountServlet extends HttpServlet {
             }
         }
         catch (SQLException e) {
-            e.printStackTrace();
-            response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, e.getMessage());
+            throw new RuntimeException(e);
         }
     }
 }

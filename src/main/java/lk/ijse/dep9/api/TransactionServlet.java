@@ -12,6 +12,8 @@ import jakarta.servlet.annotation.*;
 import lk.ijse.dep9.dto.AccountDTO;
 import lk.ijse.dep9.dto.TransactionDTO;
 import lk.ijse.dep9.dto.TransferDTO;
+import lk.ijse.dep9.exception.ResponseStatusException;
+
 import javax.sql.DataSource;
 import java.io.IOException;
 import java.math.BigDecimal;
@@ -27,38 +29,32 @@ public class TransactionServlet extends HttpServlet {
     @Override
     protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
         if (request.getPathInfo() == null || request.getPathInfo().equals("/")) {
-            try {
-                if (request.getContentType() == null || !request.getContentType().startsWith("application/json")) {
-                    throw new JsonException("Invalid JSON");
-                }
-                JsonParser parser = Json.createParser(request.getReader());
-                parser.next();
-                JsonObject jsonObj = parser.getObject();
-                String transactionType = jsonObj.getString("type");
-                String json = jsonObj.toString();
-                if (transactionType.equalsIgnoreCase("withdraw")) {
-                    TransactionDTO transactionDTO = JsonbBuilder.create().fromJson(json, TransactionDTO.class);
-                    withdrawMoney(transactionDTO, response);
-                }
-                else if (transactionType.equalsIgnoreCase("deposit")) {
-                    TransactionDTO transactionDTO = JsonbBuilder.create().fromJson(json, TransactionDTO.class);
-                    depositMoney(transactionDTO, response);
-                }
-                else if (transactionType.equalsIgnoreCase("transfer")) {
-                    TransferDTO transferDTO = JsonbBuilder.create().fromJson(json, TransferDTO.class);
-                    transferMoney(transferDTO, response);
-                }
-                else {
-                    throw new JsonException("Invalid JSON");
-                }
+            if (request.getContentType() == null || !request.getContentType().startsWith("application/json")) {
+                throw new ResponseStatusException(400, "Invalid JSON");
             }
-            catch (JsonException e) {
-                e.printStackTrace();
-                response.sendError(HttpServletResponse.SC_BAD_REQUEST, e.getMessage());
+            JsonParser parser = Json.createParser(request.getReader());
+            parser.next();
+            JsonObject jsonObj = parser.getObject();
+            String transactionType = jsonObj.getString("type");
+            String json = jsonObj.toString();
+            if (transactionType.equalsIgnoreCase("withdraw")) {
+                TransactionDTO transactionDTO = JsonbBuilder.create().fromJson(json, TransactionDTO.class);
+                withdrawMoney(transactionDTO, response);
+            }
+            else if (transactionType.equalsIgnoreCase("deposit")) {
+                TransactionDTO transactionDTO = JsonbBuilder.create().fromJson(json, TransactionDTO.class);
+                depositMoney(transactionDTO, response);
+            }
+            else if (transactionType.equalsIgnoreCase("transfer")) {
+                TransferDTO transferDTO = JsonbBuilder.create().fromJson(json, TransferDTO.class);
+                transferMoney(transferDTO, response);
+            }
+            else {
+                throw new ResponseStatusException(400, "Invalid type");
             }
         }
         else {
-            response.sendError(HttpServletResponse.SC_NOT_IMPLEMENTED);
+            throw new ResponseStatusException(501);
         }
     }
 
@@ -66,10 +62,10 @@ public class TransactionServlet extends HttpServlet {
         try {
             /* Data validation */
             if (transactionDTO.getAccount() == null || !transactionDTO.getAccount().matches("[A-Fa-f\\d]{8}(-[A-Fa-f\\d]{4}){3}-[A-Fa-f\\d]{12}")) {
-                throw new JsonException("Invalid account number");
+                throw new ResponseStatusException(400, "Invalid account number");
             }
             else if (transactionDTO.getAmount() == null || transactionDTO.getAmount().compareTo(new BigDecimal(100)) < 0) {
-                throw new JsonException("Invalid amount");
+                throw new ResponseStatusException(400, "Invalid amount");
             }
 
             /* Business validation */
@@ -77,7 +73,7 @@ public class TransactionServlet extends HttpServlet {
             PreparedStatement stm = connection.prepareStatement("SELECT * FROM Account WHERE account_number = ?");
             stm.setString(1, transactionDTO.getAccount());
             ResultSet rst = stm.executeQuery();
-            if (!rst.next()) throw new JsonException("Invalid account number");
+            if (!rst.next()) throw new ResponseStatusException(400, "Invalid account number");
 
             /* Begin transactions */
             try {
@@ -111,21 +107,15 @@ public class TransactionServlet extends HttpServlet {
             }
             catch (Throwable t) {
                 connection.rollback();
-                t.printStackTrace();
-                response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Failed to deposit the money to the account");
+                throw new RuntimeException(t);
             }
             finally {
                 connection.setAutoCommit(true);
             }
             connection.close();
         }
-        catch (JsonException e) {
-            e.printStackTrace();
-            response.sendError(HttpServletResponse.SC_BAD_REQUEST, e.getMessage());
-        }
         catch (SQLException e) {
-            e.printStackTrace();
-            response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Failed to deposit the money to the account");
+            throw new RuntimeException(e);
         }
     }
 
@@ -133,9 +123,9 @@ public class TransactionServlet extends HttpServlet {
         try {
             /* Data validation */
             if (transactionDTO.getAccount() == null || !transactionDTO.getAccount().matches("[A-Fa-f\\d]{8}(-[A-Fa-f\\d]{4}){3}-[A-Fa-f\\d]{12}")) {
-                throw new JsonException("Invalid account number");
+                throw new ResponseStatusException(400, "Invalid account number");
             }else if (transactionDTO.getAmount() == null || transactionDTO.getAmount().compareTo(new BigDecimal(100)) < 0) {
-                throw new JsonException("Invalid amount");
+                throw new ResponseStatusException(400, "Invalid amount");
             }
 
             /* Business validation */
@@ -143,13 +133,11 @@ public class TransactionServlet extends HttpServlet {
             PreparedStatement stm = connection.prepareStatement("SELECT * FROM Account WHERE account_number = ?");
             stm.setString(1, transactionDTO.getAccount());
             ResultSet rst = stm.executeQuery();
-            if (!rst.next()){
-                throw new JsonException("Invalid account number");
-            }
+            if (!rst.next()) throw new ResponseStatusException(400, "Invalid account number");
 
             BigDecimal currentBalance = rst.getBigDecimal("balance");
             if (currentBalance.subtract(transactionDTO.getAmount()).compareTo(new BigDecimal(100)) < 0){
-                throw new JsonException("Insufficient account balance");
+                throw new ResponseStatusException(400, "Insufficient account balance");
             }
 
             /* Begin transactions */
@@ -187,21 +175,15 @@ public class TransactionServlet extends HttpServlet {
             }
             catch (Throwable t) {
                 connection.rollback();
-                t.printStackTrace();
-                response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Failed to withdraw the money");
+                throw new RuntimeException(t);
             }
             finally {
                 connection.setAutoCommit(true);
             }
             connection.close();
         }
-        catch (JsonException  e) {
-            e.printStackTrace();
-            response.sendError(HttpServletResponse.SC_BAD_REQUEST, e.getMessage());
-        }
         catch (SQLException e) {
-            e.printStackTrace();
-            response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Failed to withdraw");
+            throw new RuntimeException(e);
         }
     }
 
@@ -209,13 +191,13 @@ public class TransactionServlet extends HttpServlet {
         try {
             /* Data validation */
             if (transferDTO.getFrom() == null || !transferDTO.getFrom().matches("[A-Fa-f\\d]{8}(-[A-Fa-f\\d]{4}){3}-[A-Fa-f\\d]{12}")) {
-                throw new JsonException("Invalid from account number");
+                throw new ResponseStatusException(400, "Invalid from account number");
             }
             else if (transferDTO.getTo() == null || !transferDTO.getTo().matches("[A-Fa-f\\d]{8}(-[A-Fa-f\\d]{4}){3}-[A-Fa-f\\d]{12}")) {
-                throw new JsonException("Invalid to account number");
+                throw new ResponseStatusException(400, "Invalid to account number");
             }
             else if (transferDTO.getAmount() == null || transferDTO.getAmount().compareTo(new BigDecimal(100)) < 0) {
-                throw new JsonException("Invalid amount");
+                throw new ResponseStatusException(400, "Invalid amount");
             }
 
             /* Business validation */
@@ -223,7 +205,7 @@ public class TransactionServlet extends HttpServlet {
             PreparedStatement stm1 = connection.prepareStatement("SELECT * FROM Account WHERE account_number = ?");
             stm1.setString(1, transferDTO.getTo());
             ResultSet rst1 = stm1.executeQuery();
-            if (!rst1.next()) throw new JsonException("Invalid to account number");
+            if (!rst1.next()) throw new ResponseStatusException(400, "Invalid to account number");
 
             PreparedStatement stm2 = connection.prepareStatement("SELECT * FROM Account WHERE account_number = ?");
             stm2.setString(1, transferDTO.getFrom());
@@ -232,12 +214,12 @@ public class TransactionServlet extends HttpServlet {
             synchronized (this) {
                 rst2 = stm2.executeQuery();
             }
-            if (!rst2.next()) throw new JsonException("Invalid from account number");
+            if (!rst2.next()) throw new ResponseStatusException(400, "Invalid from account number");
 
             BigDecimal toAccountBalance = rst1.getBigDecimal("balance");
             BigDecimal fromAccountBalance = rst2.getBigDecimal("balance");
             if (fromAccountBalance.subtract(transferDTO.getAmount()).compareTo(new BigDecimal(100)) < 0){
-                throw new JsonException("Insufficient account balance");
+                throw new ResponseStatusException(400, "Insufficient account balance");
             }
 
             /* Begin transactions */
@@ -286,20 +268,15 @@ public class TransactionServlet extends HttpServlet {
             }
             catch (Throwable t) {
                 connection.rollback();
-                t.printStackTrace();
-                response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Failed to transfer the money");
+                throw new RuntimeException(t);
             }
             finally {
                 connection.setAutoCommit(true);
             }
             connection.close();
         }
-        catch (JsonException  e) {
-            response.sendError(HttpServletResponse.SC_BAD_REQUEST, e.getMessage());
-        }
         catch (SQLException e) {
-            e.printStackTrace();
-            response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Failed to transfer the amount");
+            throw new RuntimeException(e);
         }
     }
 }
