@@ -3,7 +3,7 @@
 This is a simple project to demonstrate the usage of **database transactions** in a multi-users environment. Four web services are exposed as APIs under the **accounts** and **transactions** resources 
 in this application.
 
-More information on the exposed web services can be found in the 
+More information on the exposed web services with example test cases can be found in the 
 API documentations listed below.
 - [Accounts API documentation](https://documenter.getpostman.com/view/25306703/2s8ZDR8kj9)
 - [Transactions API documentation](https://documenter.getpostman.com/view/25306703/2s8ZDR8kjB)
